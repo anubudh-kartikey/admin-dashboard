@@ -1,19 +1,24 @@
 import React, {useState} from 'react';
-import {Button, Card, Checkbox, Form, Input, Alert, message} from 'antd';
+import {Button, Card, Checkbox, Form, Input, message} from 'antd';
 import '../css/SignIn.css';
+import {useNavigate} from "react-router-dom";
+import {DASHBOARD_PATHS} from "../Routes/Paths";
+
 
 const SignIn: React.FC = () => {
     const [isSuccess, setIsSuccess] = useState(false);
     const [object, setObject] = useState();
     const [messageApi, contextHolder] = message.useMessage();
 
+    const navigate = useNavigate();
     const onFinish = (values: any) => {
         console.log('Success:', values);
         setIsSuccess(true);
         setObject(JSON.stringify(values));
         messageApi.success(JSON.stringify(values));
-
+        navigate(DASHBOARD_PATHS.ROOT + DASHBOARD_PATHS.HOME);
     };
+
 
     const onFinishFailed = (errorInfo: any) => {
         console.log('Failed:', errorInfo);
