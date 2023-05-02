@@ -29,7 +29,6 @@ const MyProfile = () => {
     const [object, setObject] = useState();
     const [messageApi, contextHolder] = message.useMessage();
     const onFinish = (values) => {
-        console.log(values);
         setObject(JSON.stringify(values));
         messageApi.success(JSON.stringify(values));
     };

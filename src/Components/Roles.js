@@ -1,16 +1,32 @@
-import {Form, Input, InputNumber, Popconfirm, Table, Typography} from 'antd';
+import {Form, Input, InputNumber, message, Popconfirm, Table, Typography} from 'antd';
 import {useState} from 'react';
 import '../css/Table.css';
 import RoleForm from "./RoleForm";
+import {gql, useLazyQuery, useMutation, useQuery} from "@apollo/client";
 
-let originData = [];
-for (let i = 0; i < 5; i++) {
-    originData.push({
-        key: i.toString(),
-        roleName: `ROOT ADMIN ${i}`,
-        roleCode: `ROOT_ADMIN_${i}`,
-    });
-}
+export const GET_ALL_ROLES = gql`
+    query Roles {
+        roles {
+            _id
+            roleCode
+            roleName
+            createdAt
+        }
+    }
+`
+
+const DELETE_ROLE = gql`
+    query Query($deleteRoleId: ID!) {
+        deleteRole(id: $deleteRoleId)
+    }
+`
+
+const UPDATE_ROLE = gql`
+    mutation UpdateRole($role: RoleInput) {
+        updateRole(role: $role)
+    }
+`
+
 const EditableCell = ({
                           editing,
                           dataIndex,
@@ -49,47 +65,69 @@ const EditableCell = ({
 
 const Roles = () => {
     const [form] = Form.useForm();
-    const [data, setData] = useState(originData);
+    const [messageApi, contextHolder] = message.useMessage();
+    let {data, refetch} = useQuery(
+        GET_ALL_ROLES,
+        {
+            onError(error) {
+                console.log(error)
+            },
+        }
+    )
+
+    const [deleteRoleById] = useLazyQuery(DELETE_ROLE);
     const [editingKey, setEditingKey] = useState('');
-    const isEditing = (record) => record.key === editingKey;
+    const [updateRoleById] = useMutation(UPDATE_ROLE, {
+        refetchQueries: [GET_ALL_ROLES]
+    });
+
+    const isEditing = (record) => record._id === editingKey;
     const edit = (record) => {
         form.setFieldsValue({
             roleName: '',
             roleCode: '',
             ...record,
         });
-        setEditingKey(record.key);
+        setEditingKey(record._id);
     };
     const cancel = () => {
         setEditingKey('');
     };
-    const save = async (key) => {
+    const save = async (id) => {
         try {
             const row = await form.validateFields();
-            const newData = [...data];
-            const index = newData.findIndex((item) => key === item.key);
-            if (index > -1) {
-                const item = newData[index];
-                newData.splice(index, 1, {
-                    ...item,
-                    ...row,
-                });
-                setData(newData);
-                setEditingKey('');
-            } else {
-                newData.push(row);
-                setData(newData);
-                setEditingKey('');
-            }
+            await updateRoleById({
+                variables: {
+                    role: {id: id, roleCode: row.roleCode, roleName: row.roleName}
+                },
+                onCompleted() {
+                    messageApi.success("Role updated successfully")
+                    setEditingKey('');
+                },
+                onError(error) {
+                    messageApi.error(error.message)
+                    console.log(error)
+                }
+            });
         } catch (errInfo) {
             console.log('Validate Failed:', errInfo);
         }
     };
 
     const deleteRecord = async (key) => {
-        originData = originData.filter(record => record.key !== key);
-        setData(originData);
-        setEditingKey('');
+        await deleteRoleById({
+            variables: {
+                deleteRoleId: key
+            },
+            onCompleted() {
+                messageApi.success("Role deleted successfully")
+                refetch();
+            },
+            onError(error) {
+                messageApi.error(error.message)
+                console.log(error)
+            }
+        });
     }
 
     const columns = [
@@ -116,7 +154,7 @@ const Roles = () => {
                         {editable ? (
                             <span>
                     <Typography.Link
-                        onClick={() => save(record.key)}
+                        onClick={() => save(record._id)}
                         style={{marginRight: 8}}
                     >
                         Save
@@ -136,7 +174,7 @@ const Roles = () => {
                     </Typography.Link>
                     <Popconfirm
                         title="Sure to delete?"
-                        onConfirm={() => deleteRecord(record.key)}
+                        onConfirm={() => deleteRecord(record._id)}
                     >
                         <Typography.Link>Delete</Typography.Link>
                     </Popconfirm>
@@ -164,6 +202,7 @@ const Roles = () => {
     });
     return (
         <>
+            {contextHolder}
             <div style={{display: 'flex', justifyContent: 'flex-end'}}>
                 <RoleForm/>
             </div>
@@ -176,7 +215,8 @@ const Roles = () => {
                         },
                     }}
                     bordered
-                    dataSource={data}
+                    rowKey={(record) => record._id}
+                    dataSource={data?.roles}
                     columns={mergedColumns}
                     rowClassName="editable-row"
                     pagination={{

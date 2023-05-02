@@ -103,7 +103,6 @@ const UserForm = () => {
 
 
     const onCreate = (values) => {
-        console.log('Received values of form: ', values);
         messageApi.success(JSON.stringify(values));
         setOpen(false);
 

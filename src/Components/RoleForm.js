@@ -1,7 +1,13 @@
-import {Button, Form, Input, message, Modal, Space} from 'antd';
+import {Button, Form, Input, message, Modal} from 'antd';
 import React, {useState} from 'react';
-import {MinusCircleOutlined, PlusOutlined} from "@ant-design/icons";
+import {gql, useMutation} from "@apollo/client";
+import {GET_ALL_ROLES} from "./Roles";
 
+const CREATE_ROLE = gql`
+    mutation CreateRole($role: RoleInput) {
+        createRole(role: $role)
+    }
+`
 
 const CollectionCreateForm = ({open, onCreate, onCancel}) => {
     const [form] = Form.useForm();
@@ -33,42 +39,18 @@ const CollectionCreateForm = ({open, onCreate, onCancel}) => {
                     modifier: 'public',
                 }}
             >
-                <Form.List name="roleList">
-                    {(fields, {add, remove}) => (
-                        <>
-                            {fields.map(({key, name, ...restField}) => (
-                                <Space key={key} style={{display: 'flex', marginBottom: 8}} align="baseline">
-                                    <Form.Item
-                                        {...restField}
-                                        name={[name, 'key']}
-                                        initialValue={'P_' + key}
-                                    >
-                                    </Form.Item>
-                                    <Form.Item
-                                        {...restField}
-                                        name={[name, 'roleName']}
-                                        rules={[{required: true, message: 'Missing Role name'}]}
-                                    >
-                                        <Input placeholder="Role Name"/>
-                                    </Form.Item>
-                                    <Form.Item
-                                        {...restField}
-                                        name={[name, 'roleCode']}
-                                        rules={[{required: true, message: 'Missing Role code'}]}
-                                    >
-                                        <Input placeholder="Role Code"/>
-                                    </Form.Item>
-                                    <MinusCircleOutlined onClick={() => remove(name)}/>
-                                </Space>
-                            ))}
-                            <Form.Item>
-                                <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined/>}>
-                                    Add Row
-                                </Button>
-                            </Form.Item>
-                        </>
-                    )}
-                </Form.List>
+                <Form.Item
+                    name={'roleName'}
+                    rules={[{required: true, message: 'Missing Role name'}]}
+                >
+                    <Input placeholder="Role Name"/>
+                </Form.Item>
+                <Form.Item
+                    name={'roleCode'}
+                    rules={[{required: true, message: 'Missing Role code'}]}
+                >
+                    <Input placeholder="Role Code"/>
+                </Form.Item>
 
             </Form>
         </Modal>
@@ -77,11 +59,23 @@ const CollectionCreateForm = ({open, onCreate, onCancel}) => {
 const RoleForm = () => {
     const [open, setOpen] = useState(false);
     const [messageApi, contextHolder] = message.useMessage();
+    const [createRole] = useMutation(CREATE_ROLE, {
+        refetchQueries: [GET_ALL_ROLES],
+    })
 
-
-    const onCreate = (values) => {
-        console.log('Received values of form: ', values);
-        messageApi.success(JSON.stringify(values));
+    const onCreate = async (values) => {
+        await createRole({
+            variables: {
+                role: values
+            },
+            onCompleted() {
+                messageApi.success("Role created successfully")
+            },
+            onError(error) {
+                messageApi.error(error.message)
+                console.log(error)
+            }
+        });
         setOpen(false);
 
     };

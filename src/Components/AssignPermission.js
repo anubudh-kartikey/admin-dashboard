@@ -1,25 +1,44 @@
 import React from 'react';
-import {Collapse, Empty} from 'antd';
+import {Collapse} from 'antd';
 import SelectItems from "./Commom/SelectItems";
+import {gql, useQuery} from "@apollo/client";
 
 const {Panel} = Collapse;
 
+export const GET_ALL_ROLES_WITH_ALL_PERMISSION = gql`
+    query GetAllRolesWithAllPermission {
+        getAllRolesWithAllPermission {
+            _id
+            roleCode
+            roleName
+            createdAt
+            permission {
+                id
+                permissionCode
+                permissionName
+                createdAt
+            }
+        }
+    }
+`
+
 const AssignPermission: React.FC = () => {
+    const {data} = useQuery(
+        GET_ALL_ROLES_WITH_ALL_PERMISSION,
+        {
+            onError(error) {
+                console.log(error)
+            }
+        }
+    );
     return (
 
         <Collapse accordion>
-            <Panel header="ROOT ADMIN" key="1">
-                <SelectItems/>
-            </Panel>
-            <Panel header="BPS ADMIN" key="2">
-                <SelectItems/>
-            </Panel>
-            <Panel header="ACH HIGH ADMIN" key="3">
-                <SelectItems/>
-            </Panel>
-            <Panel header="CUSTOMER" key="4">
-                <Empty/>
-            </Panel>
+            {data?.getAllRolesWithAllPermission?.map(value => (
+                <Panel header={value.roleName} key={value.roleCode}>
+                    <SelectItems allPermission={value?.permission} roleCode={value.roleCode}/>
+                </Panel>
+            ))}
         </Collapse>
     );
 }

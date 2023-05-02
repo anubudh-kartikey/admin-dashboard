@@ -1,10 +1,35 @@
-import {Form, Input, InputNumber, Popconfirm, Table, Typography} from 'antd';
+import {Form, Input, InputNumber, message, Popconfirm, Space, Table, Typography} from 'antd';
 import {useState} from 'react';
 import '../css/Table.css';
 import PermissionForm from "./PermissionForm";
-import {PermissionList} from "../Utils/Constants";
-import {useQuery} from "@apollo/client";
-import {GET_ALL_PERMISSIONS} from "../GraphQL/Query/Query";
+import {gql, useLazyQuery, useMutation, useQuery} from "@apollo/client";
+import Search from "antd/es/input/Search";
+
+
+export const GET_ALL_PERMISSIONS = gql`
+    query Permissions {
+        permissions {
+            id
+            permissionCode
+            permissionName
+            createdAt
+        }
+    }
+
+`
+
+const DELETE_PERMISSION = gql`
+    query Query($deletePermissionId: ID!) {
+        deletePermission(id: $deletePermissionId)
+    }
+`
+
+const UPDATE_PERMISSION = gql`
+    mutation UpdatePermission($permission: PermissionInput) {
+        updatePermission(permission: $permission)
+    }
+`
+
 
 const EditableCell = ({
                           editing,
@@ -41,60 +66,83 @@ const EditableCell = ({
     );
 };
 
+function filterIt(arr, searchKey) {
+    return arr.filter(function (obj) {
+        return Object.keys(obj).some(function (key) {
+            return obj[key].includes(searchKey);
+        })
+    });
+}
 
 const Permissions = () => {
-    let originData = PermissionList();
-    const { response, loading } = useQuery(
+    const [messageApi, contextHolder] = message.useMessage();
+    let {data, refetch} = useQuery(
         GET_ALL_PERMISSIONS,
         {
             onError(error) {
                 console.log(error)
             },
         }
-    )
-    console.log('data coming from the network: ',response)
+    );
+
+    const [deletePermissionById] = useLazyQuery(DELETE_PERMISSION)
     const [form] = Form.useForm();
-    const [data, setData] = useState(originData);
     const [editingKey, setEditingKey] = useState('');
-    const isEditing = (record) => record.key === editingKey;
+    const [updatePermissionById] = useMutation(UPDATE_PERMISSION, {
+        refetchQueries: [GET_ALL_PERMISSIONS]
+    });
+    const onSearch = (value: string) => {
+        // setData(filterIt(data, value))
+    }
+
+
+    const isEditing = (record) => record.id === editingKey;
     const edit = (record) => {
         form.setFieldsValue({
             permissionName: '',
             permissionCode: '',
             ...record,
         });
-        setEditingKey(record.key);
+        setEditingKey(record.id);
     };
     const cancel = () => {
         setEditingKey('');
     };
-    const save = async (key) => {
+    const save = async (id) => {
         try {
             const row = await form.validateFields();
-            const newData = [...data];
-            const index = newData.findIndex((item) => key === item.key);
-            if (index > -1) {
-                const item = newData[index];
-                newData.splice(index, 1, {
-                    ...item,
-                    ...row,
-                });
-                setData(newData);
-                setEditingKey('');
-            } else {
-                newData.push(row);
-                setData(newData);
-                setEditingKey('');
-            }
+            await updatePermissionById({
+                variables: {
+                    permission: {id: id, permissionCode: row.permissionCode, permissionName: row.permissionName}
+                },
+                onCompleted() {
+                    messageApi.success("Permission updated successfully")
+                    setEditingKey('');
+                },
+                onError(error) {
+                    messageApi.error(error.message)
+                    console.log(error)
+                }
+            });
         } catch (errInfo) {
             console.log('Validate Failed:', errInfo);
         }
     };
 
     const deleteRecord = async (key) => {
-        originData = originData.filter(record => record.key !== key);
-        setData(originData);
-        setEditingKey('');
+        await deletePermissionById({
+            variables: {
+                deletePermissionId: key
+            },
+            onCompleted() {
+                messageApi.success("Permission deleted successfully")
+                refetch();
+            },
+            onError(error) {
+                messageApi.error(error.message)
+                console.log(error)
+            }
+        });
     }
 
     const columns = [
@@ -121,7 +169,7 @@ const Permissions = () => {
                         {editable ? (
                             <span>
                     <Typography.Link
-                        onClick={() => save(record.key)}
+                        onClick={() => save(record.id)}
                         style={{marginRight: 8}}
                     >
                         Save
@@ -141,7 +189,7 @@ const Permissions = () => {
                     </Typography.Link>
                     <Popconfirm
                         title="Sure to delete?"
-                        onConfirm={() => deleteRecord(record.key)}
+                        onConfirm={() => deleteRecord(record.id)}
                     >
                         <Typography.Link>Delete</Typography.Link>
                     </Popconfirm>
@@ -168,9 +216,13 @@ const Permissions = () => {
         };
     });
     return (
-        <div>
+        <>
+            {contextHolder}
             <div style={{display: 'flex', justifyContent: 'flex-end'}}>
-                <PermissionForm/>
+                <Space>
+                    <Search placeholder="search permission" allowClear onSearch={onSearch}/>
+                    <PermissionForm/>
+                </Space>
             </div>
             <br/>
             <Form form={form} component={false}>
@@ -181,7 +233,8 @@ const Permissions = () => {
                         },
                     }}
                     bordered
-                    dataSource={data}
+                    dataSource={data?.permissions}
+                    rowKey={(record) => record.id}
                     columns={mergedColumns}
                     rowClassName="editable-row"
                     pagination={{
@@ -189,7 +242,7 @@ const Permissions = () => {
                     }}
                 />
             </Form>
-        </div>
+        </>
     );
 };
 export default Permissions;

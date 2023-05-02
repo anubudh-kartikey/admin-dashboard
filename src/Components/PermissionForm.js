@@ -1,8 +1,14 @@
 import {Button, Form, Input, message, Modal, Space} from 'antd';
 import React, {useState} from 'react';
 import {MinusCircleOutlined, PlusOutlined} from "@ant-design/icons";
-import {PermissionList} from "../Utils/Constants";
+import {gql, useMutation} from "@apollo/client";
+import {GET_ALL_PERMISSIONS} from "./Permissions";
 
+const CREATE_PERMISSIONS = gql`
+    mutation CreatePermissions($permissions: [PermissionInput]) {
+        createPermissions(permissions: $permissions)
+    }
+`
 
 const CollectionCreateForm = ({open, onCreate, onCancel}) => {
     const [form] = Form.useForm();
@@ -34,17 +40,11 @@ const CollectionCreateForm = ({open, onCreate, onCancel}) => {
                     modifier: 'public',
                 }}
             >
-                <Form.List name="permissionList">
+                <Form.List name="permissions">
                     {(fields, {add, remove}) => (
                         <>
                             {fields.map(({key, name, ...restField}) => (
                                 <Space key={key} style={{display: 'flex', marginBottom: 8}} align="baseline">
-                                    <Form.Item
-                                        {...restField}
-                                        name={[name, 'key']}
-                                        initialValue={'P_' + key}
-                                    >
-                                    </Form.Item>
                                     <Form.Item
                                         {...restField}
                                         name={[name, 'permissionName']}
@@ -81,17 +81,28 @@ const CollectionCreateForm = ({open, onCreate, onCancel}) => {
 const PermissionForm = () => {
     const [open, setOpen] = useState(false);
     const [messageApi, contextHolder] = message.useMessage();
+    const [createPermission] = useMutation(CREATE_PERMISSIONS, {
+        refetchQueries: [GET_ALL_PERMISSIONS],
+    })
 
+    const onCreate = async (values) => {
+        await createPermission({
+            variables: {
+                permissions: values.permissions
+            },
+            onCompleted() {
+                messageApi.success("Permissions created successfully")
+            },
+            onError(error) {
+                console.log(error)
+            }
+        });
 
-    const onCreate = (values) => {
-        console.log('Received values of form: ', values);
-        PermissionList(values.permissionList)
-        messageApi.success(JSON.stringify(values));
         setOpen(false);
 
     };
     return (
-        <div>
+        <>
             {contextHolder}
             <Button
                 type="primary"
@@ -108,7 +119,7 @@ const PermissionForm = () => {
                     setOpen(false);
                 }}
             />
-        </div>
+        </>
     );
 };
 export default PermissionForm;

@@ -12,7 +12,6 @@ const SignIn: React.FC = () => {
 
     const navigate = useNavigate();
     const onFinish = (values: any) => {
-        console.log('Success:', values);
         setIsSuccess(true);
         setObject(JSON.stringify(values));
         messageApi.success(JSON.stringify(values));
